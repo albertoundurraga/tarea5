@@ -1,0 +1,345 @@
+library(RJSONIO)
+library(foreign)
+library(ggplot2)
+library(quantmod)
+library(tidyverse)
+library(dplyr)
+library(gridExtra)
+
+#Pregunta 2
+#Parte 1
+getSymbols(c("MSFT"), src="yahoo", from=as.Date("2000-01-01 "), to=as.Date("2018-08-31"), 
+           periodicity="monthly")
+
+getSymbols(c("AAPL"), src="yahoo", from=as.Date("2000-01-01 "), to=as.Date("2018-08-31"), 
+           periodicity="monthly")
+
+#Parte ii
+for (i in 1:224) {
+  MSFT$n[i]=i
+} 
+for (i in 1:224) {
+  AAPL$n[i]=i
+} 
+
+base<-merge(AAPL,MSFT, by.x = "n",by.y="n")
+
+N<-function(x){
+  #retornos
+  if(x==1){
+    for(i in 2:224){
+      base$retorno[1]<-Delt(base$MSFT.Close[1],base$MSFT.Open[1])
+      base$retorno[i]<-Delt(base$MSFT.Close[i],base$MSFT.Close[i-1])
+    }
+    #retornos acumulados
+    for(i in 1:224){
+      base$retorno.ac[i=1]<-base$retorno[i=1]
+      base$retorno.ac[i]<-Delt(base$MSFT.Close[i],base$MSFT.Close[1])
+    }  
+    #retorno promedio
+    p.ret.MSFT<-sum(base$retorno)/224
+    #calculamos el retorno acumulado promedio
+    p.ret.ac.MSFT<-sum(base$retorno.ac)/224
+    # desviaciones respecto a la media elevadas a la cuarta del retorno
+    for(i in 1:224 ){
+      base$cuarta.ret[i]=(base$retorno[i]-p.ret.MSFT)^{4}
+    }
+    sum.cuarta.ret.MSFT<-sum(base$cuarta.ret)
+    # suma  de las desviaciones respecto a la media elevadas a la cuarta del retorno acumulado
+    for(i in 1:224 ){
+      base$cuarta.ret.ac[i]=(base$retorno.ac[i]-p.ret.ac.MSFT)^{4}
+    }
+    sum.cuarta.ret.ac.MSFT<-sum(base$cuarta.ret.ac)
+    #suma de las desviaciones respecto a la media elevadas al cubo del retorno
+    for(i in 1:224 ){
+      base$cubos.ret[i]=(base$retorno[i]-p.ret.MSFT)^{3}
+    }
+    sum.cubos.ret.MSFT<-sum(base$cubos.ret)
+    #suma de las desviaciones respecto a la media elevadas al cubo del retorno acumulado
+    for(i in 1:224 ){
+      base$cubos.ret.ac[i]=(base$retorno.ac[i]-p.ret.ac.MSFT)^{3}
+    }
+    sum.cubos.ret.ac.MSFT<-sum(base$cubos.ret.ac)
+    #suma de las desviaciones respecto a la media elevadas al cuadrado del retorno
+    for(i in 1:224 ){
+      base$cuadrado.ret[i]=(base$retorno[i]-p.ret.MSFT)^{2}
+    }
+    sum.cuadrados.ret.MSFT<-sum(base$cuadrado.ret)
+    #suma de las desviaciones respecto a la media elevadas al cuadrado del retorno acumulado
+    for(i in 1:224 ){
+      base$cuadrado.ret.ac[i]=(base$retorno.ac[i]-p.ret.ac.MSFT)^{2}
+    }
+    sum.cuadrados.ret.ac.MSFT<-sum(base$cuadrado.ret.ac)
+    # Skeness del retorno
+    Skeness.ret.MSFT<- (sum.cubos.ret.MSFT/224)/((sum.cuadrados.ret.MSFT/x)^{3/2})
+    #Skeness del retorno acumulado
+    Skeness.ret.ac.MSFT<- (sum.cubos.ret.ac.MSFT/224)/((sum.cuadrados.ret.ac.MSFT/x)^{3/2})
+    #Kurtosis del retorno
+    Kurtosis.ret.MSFT<-(sum.cuarta.ret.MSFT/224)/((sum.cuadrados.ret.MSFT/x)^{2})
+    #Kurtosis del retorno acumulado
+    Kurtosis.ret.ac.MSFT<-(sum.cuarta.ret.ac.MSFT/224)/((sum.cuadrados.ret.ac.MSFT/x)^{2})
+    # Jarque Bera
+    JB.ret.MSFT<-224*(((Skeness.ret.MSFT^{2})/6) + (Kurtosis.ret.MSFT-3)^{2}/24)
+    #Definimos el estadistico de Jarque Bera para el retorno acumulado
+    JB.ret.ac.MSFT<-224*(((Skeness.ret.ac.MSFT^{2})/6) + (Kurtosis.ret.ac.MSFT-3)^{2}/24)
+    
+    
+    data.ret = data.frame(base$retorno,base$n, base$retorno.ac)
+    Hipotesis_Nula<-c("El retorno sigue una distribución normal")
+    Cantidad_de_precios<-224
+    Test_Jarque_Bera_para_Retorno<-"-"
+    Valor_critico_al_90<-ifelse(JB.ret.MSFT>qchisq(0.90,2),"Se rechaza H_0","No se rechaza H_0")
+    Valor_critico_al_95<-ifelse(JB.ret.MSFT>qchisq(0.95,2),"Se rechaza H_0","No se rechaza H_0")
+    Valor_critico_al_99<-ifelse(JB.ret.MSFT>qchisq(0.99,2),"Se rechaza H_0", "No se rechaza H_0")
+    tabla.ret = rbind(Test_Jarque_Bera_para_Retorno,Hipotesis_Nula, Cantidad_de_precios, JB.ret.MSFT,Valor_critico_al_90,Valor_critico_al_95,Valor_critico_al_99)
+    
+    Hipotesis__Nula<-c("El retorno acumulado sigue una distribución normal")
+    Test_Jarque_Bera_para_Retorno_Acumulado<-"-"
+    Valor_critico_al__90<-ifelse(JB.ret.ac.MSFT>qchisq(0.90,2),"Se rechaza H_0","No se rechaza H_0")
+    Valor_critico_al__95<-ifelse(JB.ret.ac.MSFT>qchisq(0.95,2),"Se rechaza H_0","No se rechaza H_0")
+    Valor_critico_al__99<-ifelse(JB.ret.ac.MSFT>qchisq(0.99,2),"Se rechaza H_0", "No se rechaza H_0")
+    tabla.ret.ac = rbind(Test_Jarque_Bera_para_Retorno_Acumulado,Hipotesis__Nula, Cantidad_de_precios, JB.ret.ac.MSFT,Valor_critico_al_90,Valor_critico_al__95,Valor_critico_al__99)
+    
+    
+    grafRet = data.ret %>% ggplot(aes(n,retorno))+geom_line()
+    grafRetacum= data.ret %>% ggplot(aes(n,retorno.ac))+geom_line()
+    
+    mostrar<-list(grafRet,tabla.ret,grafRetacum,tabla.ret.ac)
+    return(mostrar)
+  }
+  else {
+    for(i in 2:224){
+      base$retorno[1]<-Delt(base$MSFT.Close[1],base$MSFT.Open[1])
+      base$retorno[i]<-Delt(base$MSFT.Close[i],base$MSFT.Close[i-1])}
+    
+    #retornos acumulados
+    for(i in 1:224){
+      base$retorno.ac[1]<-base$retorno[i=1]
+      base$retorno.ac[i]<-Delt(base$MSFT.Close[i],base$MSFT.Close[1])
+    }  
+    #retorno promedio
+    p.ret.MSFT<-sum(base$retorno)/224
+    #calculamos el retorno acumulado promedio
+    p.ret.ac.MSFT<-sum(base$retorno.ac)/224
+    # desviaciones respecto a la media elevadas a la cuarta del retorno
+    for(i in 1:224 ){
+      base$cuarta.ret[i]=(base$retorno[i]-p.ret.MSFT)^{4}
+    }
+    sum.cuarta.ret.MSFT<-sum(base$cuarta.ret)
+    # suma  de las desviaciones respecto a la media elevadas a la cuarta del retorno acumulado
+    for(i in 1:224 ){
+      base$cuarta.ret.ac[i]=(base$retorno.ac[i]-p.ret.ac.MSFT)^{4}
+    }
+    sum.cuarta.ret.ac.MSFT<-sum(base$cuarta.ret.ac)
+    #suma de las desviaciones respecto a la media elevadas al cubo del retorno
+    for(i in 1:224 ){
+      base$cubos.ret[i]=(base$retorno[i]-p.ret.MSFT)^{3}
+    }
+    sum.cubos.ret.MSFT<-sum(base$cubos.ret)
+    #suma de las desviaciones respecto a la media elevadas al cubo del retorno acumulado
+    for(i in 1:224 ){
+      base$cubos.ret.ac[i]=(base$retorno.ac[i]-p.ret.ac.MSFT)^{3}
+    }
+    sum.cubos.ret.ac.MSFT<-sum(base$cubos.ret.ac)
+    #suma de las desviaciones respecto a la media elevadas al cuadrado del retorno
+    for(i in 1:224 ){
+      base$cuadrado.ret[i]=(base$retorno[i]-p.ret.MSFT)^{2}
+    }
+    sum.cuadrados.ret.MSFT<-sum(base$cuadrado.ret)
+    #suma de las desviaciones respecto a la media elevadas al cuadrado del retorno acumulado
+    for(i in 1:224 ){
+      base$cuadrado.ret.ac[i]=(base$retorno.ac[i]-p.ret.ac.MSFT)^{2}
+    }
+    sum.cuadrados.ret.ac.MSFT<-sum(base$cuadrado.ret.ac)
+    # Skeness del retorno
+    Skeness.ret.MSFT<- (sum.cubos.ret.MSFT/224)/((sum.cuadrados.ret.MSFT/x)^{3/2})
+    #Skeness del retorno acumulado
+    Skeness.ret.ac.MSFT<- (sum.cubos.ret.ac.MSFT/224)/((sum.cuadrados.ret.ac.MSFT/x)^{3/2})
+    #Kurtosis del retorno
+    Kurtosis.ret.MSFT<-(sum.cuarta.ret.MSFT/224)/((sum.cuadrados.ret.MSFT/x)^{2})
+    #Kurtosis del retorno acumulado
+    Kurtosis.ret.ac.MSFT<-(sum.cuarta.ret.ac.MSFT/224)/((sum.cuadrados.ret.ac.MSFT/x)^{2})
+    # Jarque Bera
+    JB.ret.MSFT<-224*(((Skeness.ret.MSFT^{2})/6) + (Kurtosis.ret.MSFT-3)^{2}/24)
+    #Definimos el estadistico de Jarque Bera para el retorno acumulado
+    JB.ret.ac.MSFT<-224*(((Skeness.ret.ac.MSFT^{2})/6) + (Kurtosis.ret.ac.MSFT-3)^{2}/24)
+    
+    
+    data.ret = data.frame(base$retorno,base$n, base$retorno.ac)
+    Hipotesis_Nula<-c("El retorno sigue una distribución normal")
+    Cantidad_de_precios<-224
+    Test_Jarque_Bera_para_Retorno<-"-"
+    Valor_critico_al_90<-ifelse(JB.ret.MSFT>qchisq(0.90,2),"Se rechaza H_0","No se rechaza H_0")
+    Valor_critico_al_95<-ifelse(JB.ret.MSFT>qchisq(0.95,2),"Se rechaza H_0","No se rechaza H_0")
+    Valor_critico_al_99<-ifelse(JB.ret.MSFT>qchisq(0.99,2),"Se rechaza H_0", "No se rechaza H_0")
+    tabla.ret = rbind(Test_Jarque_Bera_para_Retorno,Hipotesis_Nula, Cantidad_de_precios, JB.ret.MSFT,Valor_critico_al_90,Valor_critico_al_95,Valor_critico_al_99)
+    
+    Hipotesis__Nula<-c("El retorno acumulado sigue una distribución normal")
+    Test_Jarque_Bera_para_Retorno_Acumulado<-"-"
+    Valor_critico_al__90<-ifelse(JB.ret.ac.MSFT>qchisq(0.90,2),"Se rechaza H_0","No se rechaza H_0")
+    Valor_critico_al__95<-ifelse(JB.ret.ac.MSFT>qchisq(0.95,2),"Se rechaza H_0","No se rechaza H_0")
+    Valor_critico_al__99<-ifelse(JB.ret.ac.MSFT>qchisq(0.99,2),"Se rechaza H_0", "No se rechaza H_0")
+    tabla.ret.ac = rbind(Test_Jarque_Bera_para_Retorno_Acumulado,Hipotesis__Nula, Cantidad_de_precios, JB.ret.ac.MSFT,Valor_critico_al_90,Valor_critico_al__95,Valor_critico_al__99)
+    
+    
+    grafRet = data.ret %>% ggplot(aes(n,retorno))+geom_line()
+    grafRetacum= data.ret %>% ggplot(aes(n,retorno.ac))+geom_line()
+    
+    
+    for(i in 2:224){
+      base$retornoA[1]<-Delt(base$AAPL.Close[1],base$AAPL.Open[1])
+      base$retornoA[i]<-Delt(base$AAPL.Close[i],base$AAPL.Close[i-1])
+    }
+    
+    for(i in 2:224){
+      base$retorno.acA[i=1]<-base$retorno[i=1]
+      base$retorno.acA[i]<-Delt(base$AAPL.Close[i],base$AAPL.Close[1])
+    }  
+    
+    m.ret.AAPL<-sum(base$retornoA)/224
+    
+    m.ret.ac.AAPL<-sum(base$retorno.acA)/224
+    
+    for(i in 1:224){
+      base$cuarta.retA[i]=(base$retornoA[i]-m.ret.AAPL)^{4}
+    }
+    sum.cuarta.ret.AAPL<-sum(base$cuarta.retA)
+    
+    for(i in 1:224 ){
+      base$cuarta.ret.acA[i]=(base$retorno.acA[i]-m.ret.ac.AAPL)^{4}
+    }
+    sum.cuarta.ret.ac.AAPL<-sum(base$cuarta.ret.acA)
+    
+    for(i in 1:224 ){
+      base$cubos.retA[i]=(base$retornoA[i]-m.ret.AAPL)^{3}
+    }
+    sum.cubos.ret.AAPL<-sum(base$cubos.retA)
+    
+    for(i in 1:224 ){
+      base$cubos.ret.acA[i]=(base$retorno.acA[i]-m.ret.ac.AAPL)^{3}
+    }
+    sum.cubos.ret.ac.AAPL<-sum(base$cubos.ret.acA)
+    
+    for(i in 1:224 ){
+      base$cuadrado.retA[i]=(base$retornoA[i]-m.ret.AAPL)^{2}
+    }
+    sum.cuadrados.ret.AAPL<-sum(base$cuadrado.retA)
+    
+    for(i in 1:224 ){
+      base$cuadrado.ret.acA[i]=(base$retorno.acA[i]-m.ret.ac.AAPL)^{2}
+    }
+    sum.cuadrados.ret.ac.AAPL<-sum(base$cuadrado.ret.acA)
+    
+    Skeness.ret.AAPL<- (sum.cubos.ret.AAPL/224)/((sum.cuadrados.ret.AAPL/224)^{3/2})
+    
+    Skeness.ret.ac.AAPL<- (sum.cubos.ret.ac.AAPL/224)/((sum.cuadrados.ret.ac.AAPL/x)^{3/2})
+    
+    Kurtosis.ret.AAPL<-(sum.cuarta.ret.AAPL/224)/((sum.cuadrados.ret.AAPL/224)^{2})
+    
+    Kurtosis.ret.ac.AAPL<-(sum.cuarta.ret.ac.AAPL/224)/((sum.cuadrados.ret.ac.AAPL/224)^{2})
+    
+    JB.ret.AAPL<-224*(((Skeness.ret.AAPL^{2})/6) + (Kurtosis.ret.AAPL-3)^{2}/24)
+    
+    JB.ret.ac.AAPL<-224*(((Skeness.ret.ac.AAPL^{2})/6) + (Kurtosis.ret.ac.AAPL-3)^{2}/24)
+    
+    
+    data.ret = data.frame(base$retornoA,base$n, base$retorno.acA)
+    Hipotesis_Nula<-c("El retorno sigue una distribución normal")
+    Cantidad_de_precios<-224
+    Test_Jarque_Bera_para_Retorno<-"-"
+    Valor_critico_al_90a<-ifelse(JB.ret.AAPL>qchisq(0.90,2),"Se rechaza H_0","No se rechaza H_0")
+    Valor_critico_al_95a<-ifelse(JB.ret.AAPL>qchisq(0.95,2),"Se rechaza H_0","No se rechaza H_0")
+    Valor_critico_al_99a<-ifelse(JB.ret.AAPL>qchisq(0.99,2),"Se rechaza H_0", "No se rechaza H_0")
+    tabla.retA = rbind(Test_Jarque_Bera_para_Retorno,Hipotesis_Nula, Cantidad_de_precios, JB.ret.AAPL,Valor_critico_al_90a,Valor_critico_al_95a,Valor_critico_al_99a)
+    
+    Hipotesis__Nula<-c("El retorno acumulado sigue una distribución normal")
+    Test_Jarque_Bera_para_Retorno_Acumulado<-"-"
+    Valor_critico_al__90a<-ifelse(JB.ret.ac.AAPL>qchisq(0.90,2),"Se rechaza H_0","No se rechaza H_0")
+    Valor_critico_al__95a<-ifelse(JB.ret.ac.AAPL>qchisq(0.95,2),"Se rechaza H_0","No se rechaza H_0")
+    Valor_critico_al__99a<-ifelse(JB.ret.ac.AAPL>qchisq(0.99,2),"Se rechaza H_0", "No se rechaza H_0")
+    tabla.ret.acA = rbind(Test_Jarque_Bera_para_Retorno_Acumulado,Hipotesis__Nula, Cantidad_de_precios, JB.ret.ac.AAPL,Valor_critico_al_90a,Valor_critico_al__95a,Valor_critico_al__99a)
+    
+    
+    grafRetA = data.ret %>% ggplot(aes(n,retornoA))+geom_line()
+    grafRetacumA= data.ret %>% ggplot(aes(n,retorno.acA))+geom_line()
+    
+    
+    resultado<-list(grafRetA,tabla.retA,grafRetacumA,tabla.ret.acA,grafRet,tabla.ret,grafRetacum,tabla.ret.ac)
+    return(resultado)
+  }
+}
+N(1)
+N(2)
+
+
+
+
+
+
+#Pregunta 3
+#a
+set.seed(1997)
+reps=10000
+betas=matrix(NA,nrow=reps,ncol=8)
+beta0=2
+beta1=2.5
+beta2=1
+n=c(50,100,500,1000)
+for(j in 1:length(n)){
+  x1<-rnorm(n[j],20,1)
+  x2=0.8*x1+rnorm(n[j],0,1)
+  for(i in 1:reps){
+    u<-rnorm(n[j],0,1)
+    y=beta0+beta1*x1+beta2*x2+u
+    model=lm(y~x1)
+    betas[i,j]=model$coef[1]
+    betas[i,j+4]=model$coef[2]
+    
+  }
+  
+}
+betas_df<-data.frame(betas)
+colnames(betas_df)<-c("B0_50","B0_100","B0_500","B0_1000",
+                      "B1_50","B1_100","B1_500","B1_1000")
+apply(betas_df,2,mean)
+apply(betas_df,2,var)
+
+#b
+g1<-ggplot(betas_df, aes(B1_50))+geom_histogram(col="red", bins=50)
+g2<-ggplot(betas_df, aes(B1_100))+geom_histogram(col="red", bins=50)
+g3<-ggplot(betas_df, aes(B1_500))+geom_histogram(col="red", bins=50)
+g4<-ggplot(betas_df, aes(B1_1000))+geom_histogram(col="red", bins=50)
+
+grid.arrange(g1,g2,g3,g4,nrow=2,ncol=2)
+
+#c
+set.seed(1997)
+reps=10000
+betas=matrix(NA,nrow=reps,ncol=8)
+beta0=2
+beta1=2.5
+beta2=1
+n=c(50,100,500,1000)
+for(j in 1:length(n)){
+  x1<-rnorm(n[j],20,1)
+  x2=runif(n[j],0,1)
+  for(i in 1:reps){
+    u<-rnorm(n[j],0,1)
+    y=beta0+beta1*x1+beta2*x2+u
+    model=lm(y~x1)
+    betas[i,j]=model$coef[1]
+    betas[i,j+4]=model$coef[2]
+    
+  }
+  
+}
+betas_df<-data.frame(betas)
+apply(betas_df,2,mean)
+apply(betas_df,2,var)
+
+g1<-ggplot(betas_df, aes(B1_50))+geom_histogram(col="red", bins=50)
+g2<-ggplot(betas_df, aes(B1_100))+geom_histogram(col="red", bins=50)
+g3<-ggplot(betas_df, aes(B1_500))+geom_histogram(col="red", bins=50)
+g4<-ggplot(betas_df, aes(B1_1000))+geom_histogram(col="red", bins=50)
+
+grid.arrange(g1,g2,g3,g4,nrow=2,ncol=2)
